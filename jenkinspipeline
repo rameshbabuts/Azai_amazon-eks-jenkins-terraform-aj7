@@ -1,0 +1,68 @@
+pipeline{
+    agent any
+        tools{
+            jdk "jdk"
+            maven "maven"
+        }
+        environment {
+        SCANNER_HOME=tool 'sonar-scanner'
+        }
+        stages{
+            stage ('Clean'){
+                steps{
+                cleanWs()    
+                }
+            }
+            stage ('checkoutscm'){
+                steps{
+                    checkout scmGit(branches: [[name: '*/master']], extensions: [], userRemoteConfigs: [[url: 'https://github.com/rameshbabuts/Azai_amazon-eks-jenkins-terraform-aj7.git']])
+                }
+            }
+            stage ("maven compile"){
+                steps{
+                    sh 'mvn clean compile'
+                }
+            }
+            stage("Sonarqube Analysis"){
+                steps{
+                    script{
+                        withSonarQubeEnv(credentialsId: 'sonar-token') {
+                        sh 'mvn sonar:sonar'
+                        }    
+                    }
+                }
+            }
+            stage("install"){
+            steps{
+                sh " mvn clean install"
+            }
+        }
+
+            stage("Docker Build & Push"){
+            steps{
+                script{
+                   withDockerRegistry(credentialsId: 'docker', toolName: 'docker') {
+
+                        sh "docker build -t petclinic1 ."
+                        sh "docker tag petclinic1 rameshbabuts/pet-clinic123:latest "
+                        sh "docker push rameshbabuts/pet-clinic123:latest "
+
+                    }
+                }
+            }
+        }
+
+            stage("TRIVY"){
+                steps{
+                    sh "trivy image sevenajay/pet-clinic123:latest"
+            }
+        }
+
+            stage("Deploy Using Docker"){
+                steps{
+                    sh " docker run -d --name pet1 -p 8082:8080 rameshbabuts/pet-clinic123:latest "
+                   }
+                }
+
+        }
+    }
