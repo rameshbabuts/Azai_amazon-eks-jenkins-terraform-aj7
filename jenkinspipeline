@@ -4,7 +4,7 @@ pipeline{
             jdk "jdk"
             maven "maven"
         }
-        environment {
+	environment {
         SCANNER_HOME=tool 'sonar-scanner'
         }
         stages{
@@ -26,26 +26,32 @@ pipeline{
             stage("Sonarqube Analysis"){
                 steps{
                     script{
-                        withSonarQubeEnv(credentialsId: 'sonar-token') {
+                        withSonarQubeEnv(credentialsId: 'Sonar-token') {
                         sh 'mvn sonar:sonar'
                         }    
                     }
                 }
             }
-            stage("install"){
+            stage("Build"){
             steps{
                 sh " mvn clean install"
             }
         }
 
-            stage("Docker Build & Push"){
+          stage("OWASP Dependency Check"){
+            steps{
+                dependencyCheck additionalArguments: '--scan ./ ' , odcInstallation: 'DP-Check'
+                dependencyCheckPublisher pattern: '**/dependency-check-report.xml'
+            }
+        }
+        stage("Docker Build & Push"){
             steps{
                 script{
                    withDockerRegistry(credentialsId: 'docker', toolName: 'docker') {
 
-                        sh "docker build -t petclinic1 ."
-                        sh "docker tag petclinic1 rameshbabuts/pet-clinic123:latest "
-                        sh "docker push rameshbabuts/pet-clinic123:latest "
+                        sh "docker build -t petclinic ."
+                        sh "docker tag petclinic rameshbabuts/pet-clinic:latest "
+                        sh "docker push rameshbabuts/pet-clinic:latest "
 
                     }
                 }
@@ -54,15 +60,16 @@ pipeline{
 
             stage("TRIVY"){
                 steps{
-                    sh "trivy image sevenajay/pet-clinic123:latest"
+                    sh "trivy image rameshbabuts/pet-clinic:latest"
             }
         }
 
             stage("Deploy Using Docker"){
                 steps{
-                    sh " docker run -d --name pet1 -p 8082:8080 rameshbabuts/pet-clinic123:latest "
+                    sh " docker run -d --name pet1 -p 8082:8080 rameshbabuts/pet-clinic:latest "
                    }
                 }
 
         }
-    }
+    }    
+       
